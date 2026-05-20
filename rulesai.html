@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15U Beast Team: Dugout Dashboard</title>
+<!-- Chosen Palette: Warm Neutral Dugout (Stone background #f5f5f4, White cards #ffffff, Dark Charcoal text #1f2937, Brick Red accents #991b1b, Forest Green success #166534) -->
+<!-- Application Structure Plan: Designed as a "Dugout Dashboard" specifically for mobile/tablet use during live games. It features a persistent top-level Game Clock (crucial for the strict 2-hour limit), followed by a grid-based tactile navigation menu. Content is segmented into isolated view cards (hiding non-relevant info) to prevent scrolling fatigue and allow a coach to instantly find a specific rule (e.g., 'Pitching' or 'Bats') in a high-pressure dugout environment. -->
+<!-- Visualization & Content Choices: 1. Game Clock -> Goal: Track time -> Method: Interactive JS Timer -> Justification: The 2-hour limit dictates game strategy. 2. Mercy Rules -> Goal: Visualize game-ending conditions -> Method: Chart.js Bar Chart -> Justification: Allows coaches to quickly grasp the run differential needed per inning without reading text. Library: Chart.js. Confirming NO SVG or Mermaid JS is used. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { background-color: #f5f5f4; color: #1f2937; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.chart-container { position: relative; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto; height: 250px; max-height: 300px; }
+@media (min-width: 768px) { .chart-container { height: 300px; } }
+.nav-btn { transition: all 0.2s ease; }
+.nav-btn.active { background-color: #991b1b; color: #ffffff; border-color: #991b1b; transform: scale(1.02); shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+.section-content { display: none; animation: fadeIn 0.3s ease-in-out; }
+.section-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body class="min-h-screen pb-12">
+
+<header class="bg-[#991b1b] text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl md:text-2xl font-bold tracking-tight">⚾ 15U BEAST</h1>
+            <p class="text-xs md:text-sm text-red-200 uppercase tracking-wider font-semibold">Tournament Rules Quick-Ref</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <div class="text-xs font-semibold text-red-200 mb-1">GAME CLOCK (2 HR LIMIT)</div>
+            <div class="flex items-center space-x-2 bg-black/20 rounded px-2 py-1">
+                <span id="timerDisplay" class="text-xl md:text-2xl font-mono font-bold tracking-widest w-20 text-right">00:00</span>
+                <button id="startTimerBtn" class="bg-white text-[#991b1b] rounded px-2 py-1 text-xs font-bold hover:bg-gray-100">START</button>
+                <button id="resetTimerBtn" class="text-white hover:text-gray-300 rounded px-1 py-1 text-xs font-bold">↺</button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 mt-6">
+    
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6 border-l-4 border-gray-800">
+        <p class="text-sm text-gray-700 leading-relaxed">
+            <strong>Welcome Coach.</strong> This dashboard is designed for rapid dugout reference. The structural flow prioritizes immediate access to high-stakes tournament regulations (Perfect Game / WWBA - BCS). Use the timer above to track your 2-hour limit from the first pitch, and select a category below to instantly view specific operational rules, penalties, and strategic parameters.
+        </p>
+    </div>
+
+    <nav class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8" id="navigationContainer">
+        <button data-target="admin" class="nav-btn active bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>⏱️ Game Admin</span>
+        </button>
+        <button data-target="mercy" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>💥 Mercy Rules</span>
+        </button>
+        <button data-target="lineups" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>📋 Lineups & Subs</span>
+        </button>
+        <button data-target="bats" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>🏏 Bats (15U)</span>
+        </button>
+        <button data-target="pitching" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>⚾ Pitching & Def</span>
+        </button>
+        <button data-target="emergencies" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm">
+            <span>🚨 Emergencies</span>
+        </button>
+        <button data-target="playoffs" class="nav-btn bg-white border-2 border-gray-200 text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm col-span-2 md:col-span-2">
+            <span>🏆 Playoffs & Ties</span>
+        </button>
+        <button data-target="ai" class="nav-btn bg-white border-2 border-[#991b1b] text-gray-700 rounded-lg p-3 text-sm font-bold text-left flex items-center justify-between shadow-sm col-span-2 md:col-span-4 bg-red-50 hover:bg-red-100">
+            <span>✨ AI Assistant</span>
+        </button>
+    </nav>
+
+    <div id="contentContainer">
+        
+        <section id="admin" class="section-content active bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">⏱️</span> Game Administration & Timing
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Quick reference for field dimensions, strict time limits, and pre-game lineup card requirements to ensure the game starts smoothly without administrative penalties.</p>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 class="font-bold text-lg text-[#991b1b] mb-3">Core Parameters</h3>
+                    <ul class="space-y-3 text-gray-800">
+                        <li class="flex items-start"><span class="mr-2 text-xl">📏</span> <div><strong>Dimensions:</strong> 60' x 90'</div></li>
+                        <li class="flex items-start"><span class="mr-2 text-xl">⏳</span> <div><strong>Time Limit:</strong> 2 Hours strictly enforced. Clock starts on the <strong>first pitch</strong>.</div></li>
+                        <li class="flex items-start"><span class="mr-2 text-xl">🛑</span> <div><strong>New Innings:</strong> No new inning can start after the 2-hour mark.</div></li>
+                    </ul>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h3 class="font-bold text-lg text-[#991b1b] mb-3">Pre-Game Operations</h3>
+                    <ul class="space-y-3 text-gray-800">
+                        <li class="flex items-start"><span class="mr-2 text-xl">🚫</span> <div><strong>Pre-Game:</strong> NO infield practice allowed anywhere in the tournament.</div></li>
+                        <li class="flex items-start"><span class="mr-2 text-xl">📝</span> <div><strong>Lineup Cards:</strong> Must include First Name, Last Name, Position, and accurate Jersey Number. <strong>Action:</strong> Hand in before the home plate meeting.</div></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="mercy" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">💥</span> Mercy Rules
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Visual and textual guide to run-rule limits across different innings to track early game-ending scenarios and formulate aggressive or defensive strategies.</p>
+            
+            <div class="mb-6 bg-stone-50 p-4 rounded-lg border border-stone-200">
+                <div class="chart-container">
+                    <canvas id="mercyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-red-50 rounded-lg p-4 text-center border border-red-100">
+                    <div class="text-3xl font-black text-[#991b1b] mb-1">15 Runs</div>
+                    <div class="text-sm font-semibold text-gray-700 uppercase tracking-wider">After 3 Innings</div>
+                </div>
+                <div class="bg-orange-50 rounded-lg p-4 text-center border border-orange-100">
+                    <div class="text-3xl font-black text-[#c2410c] mb-1">12 Runs</div>
+                    <div class="text-sm font-semibold text-gray-700 uppercase tracking-wider">After 4 Innings</div>
+                </div>
+                <div class="bg-yellow-50 rounded-lg p-4 text-center border border-yellow-100">
+                    <div class="text-3xl font-black text-[#a16207] mb-1">8 Runs</div>
+                    <div class="text-sm font-semibold text-gray-700 uppercase tracking-wider">After 5 Innings</div>
+                </div>
+            </div>
+        </section>
+
+        <section id="lineups" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">📋</span> Lineups & Substitutions
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Details player minimums, designated/extra hitter flexibility, and courtesy runner rules to manage your roster effectively and maintain legal participation during play.</p>
+            
+            <div class="space-y-6 text-gray-800">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-[#991b1b] border-b border-gray-200 pb-1 mb-2">Roster Sizes & Locking</h3>
+                        <p class="text-sm mb-2"><strong>Minimum Players:</strong> Must start with 9. You can finish with 8, but the missing player's spot is an <strong>automatic out</strong>.</p>
+                        <p class="text-sm"><strong>Lineup Flexibility:</strong> You may bat 9, 10, or 11 players. The lineup size is strictly <strong>LOCKED</strong> after the first pitch is thrown.</p>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-[#991b1b] border-b border-gray-200 pb-1 mb-2">Designated Roles</h3>
+                        <p class="text-sm mb-2"><strong>Extra Hitters (EH/XH):</strong> The 10th and 11th hitters. They can bat anywhere in the order and substitute freely on defense.</p>
+                        <p class="text-sm"><strong>Designated Hitter (DH):</strong> The starting pitcher can DH for themselves. Must be listed as <strong>P/DH</strong> on the lineup card.</p>
+                    </div>
+                </div>
+                
+                <div class="bg-[#f8fafc] p-4 rounded-lg border border-blue-100">
+                    <h3 class="font-bold text-[#1e3a8a] mb-2 flex items-center"><span class="mr-2">🏃</span> Courtesy Runners</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                        <li>Allowed for Pitcher and Catcher at <strong>ANY</strong> time.</li>
+                        <li>The runner <em>must</em> be a valid substitute.</li>
+                        <li><strong>CRITICAL:</strong> You <em>cannot</em> use the last batted out if you are batting your entire lineup.</li>
+                        <li>The <em>same</em> substitute cannot run for both the Pitcher and Catcher in the same game.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="bats" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">🏏</span> Bat Restrictions (15U)
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Critical bat specifications specifically for the 15U division, including BBCOR and wood requirements, alongside strict penalties for utilizing illegal equipment.</p>
+            
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <h3 class="font-bold text-green-800 mb-1 text-lg">✅ Approved Equipment</h3>
+                <p class="text-sm text-green-900"><strong>Allowed:</strong> BBCOR -3 or single-piece Wood. <em>(Verify Perfect Game list for select wood composites).</em></p>
+            </div>
+
+            <h3 class="font-bold text-gray-900 mb-3 text-lg">Penalty Escalation</h3>
+            <div class="space-y-3 mb-6">
+                <div class="flex bg-yellow-50 rounded border border-yellow-200 overflow-hidden">
+                    <div class="bg-yellow-400 font-bold text-yellow-900 px-4 py-3 flex items-center justify-center w-24">1st Offense</div>
+                    <div class="p-3 text-sm text-gray-800 flex-1">Batter is <strong>OUT</strong>. Head Coach is <strong>RESTRICTED</strong> to the dugout.</div>
+                </div>
+                <div class="flex bg-red-50 rounded border border-red-200 overflow-hidden">
+                    <div class="bg-red-500 font-bold text-white px-4 py-3 flex items-center justify-center w-24">2nd Offense</div>
+                    <div class="p-3 text-sm text-gray-800 flex-1">Batter is <strong>OUT</strong>. Head Coach is <strong>EJECTED</strong>.</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 text-white p-4 rounded-lg">
+                <h3 class="font-bold text-red-400 mb-1 flex items-center"><span class="mr-2">⚠️</span> Damaged Bats Policy</h3>
+                <p class="text-sm text-gray-300">Bats with rattles, cracks, missing knobs, or worn graphics are completely banned. Refusal to let officials inspect a bat results in an automatic <strong>3-year PG suspension</strong>.</p>
+            </div>
+        </section>
+
+        <section id="pitching" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">⚾</span> Pitching & Defense
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Guidelines for mound visits, balks, pickoffs, and dugout communications to manage defensive strategies cleanly without incurring warnings or penalties.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-2xl mb-2">🚶</div>
+                    <h3 class="font-bold text-gray-900 mb-1">Mound Visits</h3>
+                    <p class="text-gray-700"><strong>ONE visit</strong> per pitcher, per inning. A second visit in the same inning requires the pitcher to be removed after the current at-bat concludes.</p>
+                </div>
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-2xl mb-2">🛑</div>
+                    <h3 class="font-bold text-gray-900 mb-1">Balks</h3>
+                    <p class="text-gray-700">MLB rule strictly enforced. <strong>A balk is NOT a dead ball.</strong> Play continues naturally.</p>
+                </div>
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="text-2xl mb-2">👀</div>
+                    <h3 class="font-bold text-gray-900 mb-1">Pickoffs & Windups</h3>
+                    <p class="text-gray-700">The 3B-to-1B pickoff move <strong>IS legal</strong>. Pitcher’s free foot can be on, in front of, behind, or to the side of the rubber during the windup.</p>
+                </div>
+                <div class="border border-gray-200 rounded-lg p-4 bg-[#f0f9ff]">
+                    <div class="text-2xl mb-2">🎧</div>
+                    <h3 class="font-bold text-blue-900 mb-1">Electronic Comms</h3>
+                    <p class="text-blue-800">One-way comms (e.g., Pitchcom) allowed from dugout to field. <strong>In-ear direct live audio is restricted to the CATCHER ONLY.</strong></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="emergencies" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">🚨</span> Emergencies & Protests
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Protocol for handling high-stress situations including rule protests, injury delays, and weather-related stoppages to maintain control during unexpected events.</p>
+            
+            <div class="space-y-4">
+                <div class="bg-gray-50 border-l-4 border-[#991b1b] p-4 shadow-sm">
+                    <h3 class="font-bold text-lg text-gray-900 flex items-center mb-1"><span class="mr-2">💵</span> Protests ($100 Cash)</h3>
+                    <p class="text-sm text-gray-700 mb-2">Allowed for <strong>rule misapplications ONLY</strong>. You cannot protest judgment calls or pitch limits.</p>
+                    <div class="text-xs font-semibold bg-white inline-block px-2 py-1 border border-gray-200 rounded text-[#991b1b]">TIMING: Must be filed before the next pitch or before umpires leave the field. Win the protest = keep your $100.</div>
+                </div>
+
+                <div class="bg-gray-50 border-l-4 border-blue-500 p-4 shadow-sm">
+                    <h3 class="font-bold text-lg text-gray-900 flex items-center mb-1"><span class="mr-2">🚑</span> Injury Delays</h3>
+                    <p class="text-sm text-gray-700">If EMS or an Athletic Trainer delays the game for <strong>more than 5 minutes</strong>, that specific amount of time is added back to the game clock.</p>
+                </div>
+
+                <div class="bg-gray-50 border-l-4 border-gray-500 p-4 shadow-sm">
+                    <h3 class="font-bold text-lg text-gray-900 flex items-center mb-1"><span class="mr-2">⛈️</span> Weather & Called Games</h3>
+                    <p class="text-sm text-gray-700">A game is official if <strong>5 innings are complete</strong> (or 4.5 innings if the Home team is winning). Halted games must resume within 1 hour.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="playoffs" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">🏆</span> Playoffs & Tie-Breakers
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Essential tie-breaker rules for pool play and bracket stages, including specific bases-loaded scenarios and mathematical seeding logic to secure advancement.</p>
+            
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <h3 class="font-bold text-[#991b1b] mb-2 text-lg">In-Game Tie-Breakers</h3>
+                    <ul class="space-y-4 text-sm text-gray-800">
+                        <li class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <strong class="text-gray-900 block mb-1">Pool Play Ties:</strong> 
+                            Tie after 7 innings or time limit = Game Ends (Counts as ½ win, ½ loss).
+                        </li>
+                        <li class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <strong class="text-gray-900 block mb-1">Playoff Tie (Non-Championship):</strong> 
+                            If tied after 7 or time limit: Start next inning with <strong>Bases Loaded, 1 Out</strong>. Placement: Last 3 hitters from previous inning on base (Last hitter on 1st, previous on 2nd, previous on 3rd).
+                        </li>
+                        <li class="bg-gray-50 p-3 rounded border border-gray-200">
+                            <strong class="text-gray-900 block mb-1">Semi & Championship:</strong> 
+                            NO time limits. Normal extra innings through the 9th. The bases-loaded tie-breaker begins in the <strong>10th inning</strong>.
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold text-[#991b1b] mb-2 text-lg">Tournament Seeding Logic</h3>
+                    <div class="bg-[#1f2937] text-white rounded-lg p-4">
+                        <p class="text-xs text-gray-300 mb-3 uppercase tracking-wider">Tie-Breaker Order of Operations:</p>
+                        <ol class="list-decimal pl-5 space-y-2 text-sm font-medium">
+                            <li>Winning Percentage</li>
+                            <li>Head-to-Head <span class="font-normal text-gray-400">(If exactly 2 teams tied)</span></li>
+                            <li>Least total runs allowed</li>
+                            <li>Total runs scored</li>
+                            <li>Runs allowed <span class="font-normal text-gray-400">(Minus worst game)</span></li>
+                            <li>Runs allowed <span class="font-normal text-gray-400">(Minus 2 worst games)</span></li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="ai" class="section-content bg-white rounded-xl shadow-md p-5 md:p-8">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b-2 border-gray-100 pb-2 flex items-center">
+                <span class="mr-2">✨</span> AI Dugout Assistant
+            </h2>
+            <p class="text-sm text-gray-600 mb-6 italic">Powered by Gemini. Get instant rule interpretations or situational strategies during the heat of the game.</p>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Tool 1: Rule Interpreter -->
+                <div class="bg-gray-50 rounded-lg p-4 border border-[#991b1b]/30 shadow-inner">
+                    <h3 class="font-bold text-[#991b1b] mb-2 text-lg">Rule Interpreter</h3>
+                    <p class="text-xs text-gray-500 mb-3">Settle disputes fast. Describe the bizarre play below.</p>
+                    <textarea id="ruleInput" class="w-full p-2 border border-gray-300 rounded mb-2 text-sm focus:outline-none focus:border-[#991b1b] resize-none" rows="3" placeholder="E.g., Batter hits a foul ball that bounces up and hits his helmet while he is still in the batter's box..."></textarea>
+                    <button id="askRuleBtn" class="bg-[#991b1b] text-white px-4 py-2 rounded text-sm font-bold hover:bg-red-800 w-full transition-colors flex justify-center items-center">
+                        ✨ Get Official Ruling
+                    </button>
+                    <div id="ruleOutput" class="mt-3 text-sm text-gray-800 hidden p-3 bg-white border border-gray-200 rounded shadow-sm"></div>
+                </div>
+
+                <!-- Tool 2: Situation Strategist -->
+                <div class="bg-gray-50 rounded-lg p-4 border border-[#991b1b]/30 shadow-inner">
+                    <h3 class="font-bold text-[#991b1b] mb-2 text-lg">Situation Strategist</h3>
+                    <p class="text-xs text-gray-500 mb-3">Input the current situation for quick coaching adjustments.</p>
+                    <div class="grid grid-cols-2 gap-2 mb-2 text-sm">
+                        <input type="text" id="stratInning" placeholder="Inning (Top 6th)" class="p-2 border border-gray-300 rounded focus:outline-none focus:border-[#991b1b]">
+                        <input type="text" id="stratScore" placeholder="Score (Us 4, Them 3)" class="p-2 border border-gray-300 rounded focus:outline-none focus:border-[#991b1b]">
+                        <select id="stratOuts" class="p-2 border border-gray-300 rounded focus:outline-none focus:border-[#991b1b] bg-white">
+                            <option value="0 Outs">0 Outs</option>
+                            <option value="1 Out">1 Out</option>
+                            <option value="2 Outs">2 Outs</option>
+                        </select>
+                        <input type="text" id="stratRunners" placeholder="Runners (1st & 2nd)" class="p-2 border border-gray-300 rounded focus:outline-none focus:border-[#991b1b]">
+                    </div>
+                    <button id="askStratBtn" class="bg-[#991b1b] text-white px-4 py-2 rounded text-sm font-bold hover:bg-red-800 w-full transition-colors flex justify-center items-center">
+                        ✨ Generate Strategy
+                    </button>
+                    <div id="stratOutput" class="mt-3 text-sm text-gray-800 hidden p-3 bg-white border border-gray-200 rounded shadow-sm"></div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</main>
+
+<script>
+const navContainer = document.getElementById('navigationContainer');
+const navButtons = document.querySelectorAll('.nav-btn');
+const sections = document.querySelectorAll('.section-content');
+let chartInstance = null;
+
+navContainer.addEventListener('click', (e) => {
+    const btn = e.target.closest('.nav-btn');
+    if (!btn) return;
+
+    const targetId = btn.getAttribute('data-target');
+
+    navButtons.forEach(b => b.classList.remove('active', 'bg-[#991b1b]', 'text-white'));
+    navButtons.forEach(b => {
+        b.classList.add('bg-white', 'text-gray-700');
+    });
+
+    btn.classList.add('active', 'bg-[#991b1b]', 'text-white');
+    btn.classList.remove('bg-white', 'text-gray-700');
+
+    sections.forEach(sec => sec.classList.remove('active'));
+
+    document.getElementById(targetId).classList.add('active');
+
+    if (targetId === 'mercy') {
+        renderMercyChart();
+    }
+});
+
+function renderMercyChart() {
+    if (chartInstance) return; 
+
+    const ctx = document.getElementById('mercyChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['After 3 Innings', 'After 4 Innings', 'After 5 Innings'],
+            datasets: [{
+                label: 'Run Differential Required',
+                data: [15, 12, 8],
+                backgroundColor: [
+                    'rgba(153, 27, 27, 0.8)', 
+                    'rgba(194, 65, 12, 0.8)', 
+                    'rgba(161, 98, 7, 0.8)'   
+                ],
+                borderColor: [
+                    'rgba(153, 27, 27, 1)',
+                    'rgba(194, 65, 12, 1)',
+                    'rgba(161, 98, 7, 1)'
+                ],
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Lead by ${context.raw} runs to end game.`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Runs Required', font: { weight: 'bold' } },
+                    max: 18
+                },
+                x: {
+                    ticks: {
+                        callback: function(val, index) {
+                            let label = this.getLabelForValue(val);
+                            if (label.length > 16) {
+                                return label.match(/.{1,16}(\s|$)/g);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+let timerInterval = null;
+let secondsLeft = 7200; 
+let isRunning = false;
+
+const display = document.getElementById('timerDisplay');
+const startBtn = document.getElementById('startTimerBtn');
+const resetBtn = document.getElementById('resetTimerBtn');
+
+function updateDisplay() {
+    let m = Math.floor(secondsLeft / 60);
+    let s = secondsLeft % 60;
+    display.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    
+    if(secondsLeft <= 900 && secondsLeft > 0) {
+        display.classList.add('text-red-400');
+    } else {
+        display.classList.remove('text-red-400');
+    }
+    
+    if(secondsLeft <= 0) {
+        display.textContent = "00:00";
+        display.classList.add('text-red-600', 'animate-pulse');
+        clearInterval(timerInterval);
+        isRunning = false;
+        startBtn.textContent = "DONE";
+    }
+}
+
+startBtn.addEventListener('click', () => {
+    if (secondsLeft <= 0) return;
+    
+    if (isRunning) {
+        clearInterval(timerInterval);
+        isRunning = false;
+        startBtn.textContent = "RESUME";
+        startBtn.classList.remove('bg-yellow-400', 'text-black');
+        startBtn.classList.add('bg-white', 'text-[#991b1b]');
+    } else {
+        isRunning = true;
+        startBtn.textContent = "PAUSE";
+        startBtn.classList.remove('bg-white', 'text-[#991b1b]');
+        startBtn.classList.add('bg-yellow-400', 'text-black');
+        timerInterval = setInterval(() => {
+            secondsLeft--;
+            updateDisplay();
+        }, 1000);
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    clearInterval(timerInterval);
+    isRunning = false;
+    secondsLeft = 7200;
+    startBtn.textContent = "START";
+    startBtn.classList.remove('bg-yellow-400', 'text-black');
+    startBtn.classList.add('bg-white', 'text-[#991b1b]');
+    display.classList.remove('text-red-400', 'text-red-600', 'animate-pulse');
+    updateDisplay();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const defaultBtn = document.querySelector('[data-target="admin"]');
+    defaultBtn.classList.add('bg-[#991b1b]', 'text-white');
+    defaultBtn.classList.remove('bg-white', 'text-gray-700');
+});
+
+// --- Gemini API Integrations ---
+const apiKey = "AIzaSyA3AgyPU5mo0NC-xxnHH_rzh6RFr21l4xU";
+
+async function callGemini(prompt, systemInstruction) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] }
+    };
+
+    const delays = [1000, 2000, 4000, 8000, 16000];
+    for (let i = 0; i < delays.length + 1; i++) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+        } catch (error) {
+            if (i < delays.length) {
+                await new Promise(res => setTimeout(res, delays[i]));
+            } else {
+                return "Error connecting to AI. Please try again.";
+            }
+        }
+    }
+}
+
+// Tool 1: Rule Interpreter
+document.getElementById('askRuleBtn').addEventListener('click', async () => {
+    const input = document.getElementById('ruleInput').value;
+    if (!input) return;
+    const btn = document.getElementById('askRuleBtn');
+    const output = document.getElementById('ruleOutput');
+    
+    btn.innerHTML = '<span class="animate-pulse">✨ Thinking...</span>';
+    btn.disabled = true;
+    output.classList.add('hidden');
+    
+    const sys = "You are an expert high school baseball umpire. The user will give you a scenario. Give a direct, concise ruling based on standard National High School Federation Baseball Rules. State clearly if it's an out, safe, foul, dead ball, etc. Keep it under 4 sentences. Format with short bold points if needed.";
+    
+    const response = await callGemini(input, sys);
+    
+    output.innerHTML = response.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    output.classList.remove('hidden');
+    btn.innerHTML = '✨ Get Official Ruling';
+    btn.disabled = false;
+});
+
+// Tool 2: Situation Strategist
+document.getElementById('askStratBtn').addEventListener('click', async () => {
+    const inning = document.getElementById('stratInning').value || 'Unknown Inning';
+    const score = document.getElementById('stratScore').value || 'Unknown Score';
+    const outs = document.getElementById('stratOuts').value;
+    const runners = document.getElementById('stratRunners').value || 'Bases Empty';
+    
+    const btn = document.getElementById('askStratBtn');
+    const output = document.getElementById('stratOutput');
+    
+    btn.innerHTML = '<span class="animate-pulse">✨ Analyzing...</span>';
+    btn.disabled = true;
+    output.classList.add('hidden');
+    
+    const prompt = `Inning: ${inning}. Score: ${score}. Outs: ${outs}. Runners on: ${runners}. Give me a quick baseball strategy.`;
+    const sys = "You are a seasoned 15U travel baseball coach. Given the game situation, provide 1 brief offensive strategy and 1 brief defensive strategy. Be highly actionable, realistic for 15 year olds, and concise. Format as 'Offense: [strategy]' and 'Defense: [strategy]'. No fluff.";
+    
+    const response = await callGemini(prompt, sys);
+    
+    output.innerHTML = response.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    output.classList.remove('hidden');
+    btn.innerHTML = '✨ Generate Strategy';
+    btn.disabled = false;
+});
+</script>
+
+</body>
+</html>
